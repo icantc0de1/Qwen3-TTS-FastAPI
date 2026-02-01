@@ -1,0 +1,112 @@
+[project]
+name = "qwen3-tts-fastapi"
+version = "0.1.0"
+description = "FastAPI-based OpenAI-compatible TTS API using Qwen3 TTS models"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    # Web framework
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.23.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    
+    # Qwen3-TTS - pulls in all required runtime dependencies
+    # (torch, transformers, accelerate, audio processing libs, etc.)
+    "qwen-tts>=0.0.5",
+    
+    # Utilities
+    "loguru>=0.7.0",
+    "python-dotenv>=1.0.0",
+    "httpx>=0.25.0",
+    
+    # Text processing
+    "inflect>=7.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/icantc0de1/qwen3-tts-fastapi"
+Repository = "https://github.com/icantc0de1/qwen3-tts-fastapi"
+
+[tool.setuptools]
+packages = ["api"]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+# Files to exclude from type checking (vendored/third-party code we don't modify)
+exclude = [
+    "api/src/core/models/modeling_qwen3_tts.py",
+    "api/src/core/models/configuration_qwen3_tts.py",
+    "api/src/core/models/processing_qwen3_tts.py",
+    "api/src/core/tokenizer_12hz",
+    "api/src/core/tokenizer_25hz",
+    "api/src/services/text_processing/normalizer.py",
+]
+
+# Suppress errors for third-party libraries without type stubs
+# These are ML/audio libraries that don't provide type information
+[[tool.mypy.overrides]]
+module = [
+    "sox",
+    "onnxruntime",
+    "onnxruntime.*",
+    "torchaudio",
+    "torchaudio.*",
+    "flash_attn",
+    "flash_attn.*",
+    "inflect",
+    "inflect.*",
+    "huggingface_hub",
+    "transformers",
+    "transformers.*",
+]
+ignore_missing_imports = true
+follow_imports = "skip"
+
+[tool.uv]
+# Use PyTorch CUDA 13 wheels
+extra-index-url = [
+    "https://download.pytorch.org/whl/cu130",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.pip]
+extra-index-url = ["https://download.pytorch.org/whl/cu130"]

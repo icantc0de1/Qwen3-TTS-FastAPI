@@ -1,0 +1,22 @@
+{
+    "models": {
+        "tts-1": "qwen3-tts-12hz-1.7b-custom-voice",
+        "tts-1-hd": "qwen3-tts-12hz-1.7b-voice-design",
+        "qwen3-12hz-1.7b-custom-voice": "qwen3-tts-12hz-1.7b-custom-voice",
+        "qwen3-12hz-1.7b-voice-design": "qwen3-tts-12hz-1.7b-voice-design",
+        "qwen3-12hz-1.7b-base": "qwen3-tts-12hz-1.7b-base",
+        "qwen3-12hz-0.6b-custom-voice": "qwen3-tts-12hz-0.6b-custom-voice",
+        "qwen3-12hz-0.6b-base": "qwen3-tts-12hz-0.6b-base"
+    },
+    "voices": {
+        "alloy": "Vivian",
+        "ash": "Serena",
+        "coral": "Uncle_Fu",
+        "echo": "Dylan",
+        "fable": "Eric",
+        "onyx": "Ryan",
+        "nova": "Aiden",
+        "sage": "Ono_Anna",
+        "shimmer": "Sohee"
+    }
+}

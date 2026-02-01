@@ -1,0 +1,1 @@
+"""Structures package for Qwen3 TTS data schemas."""
