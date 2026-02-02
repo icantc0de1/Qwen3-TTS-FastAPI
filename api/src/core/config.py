@@ -12,7 +12,6 @@ Example .env file:
     CLEANUP_ENABLED=true
 """
 
-import os
 from pathlib import Path
 from typing import Literal
 
@@ -55,6 +54,10 @@ class Settings(BaseSettings):
     default_model_size: Literal["small", "large"] = Field(
         default="small",
         description="Default model size ('small'=0.6B, 'large'=1.7B)",
+    )
+    attention_backend: Literal["eager", "sdpa", "flash_attention_2"] = Field(
+        default="sdpa",
+        description="Attention implementation backend (eager, sdpa, flash_attention_2)",
     )
 
     # Cleanup Settings
@@ -99,9 +102,11 @@ class Settings(BaseSettings):
             "qwen3-tts-12hz-1.7b-custom-voice": self.custom_voice_large_model_path,
             "qwen3-tts-12hz-1.7b-voice-design": self.voice_design_model_path,
             # OpenAI-compatible aliases (use default_model_size)
-            "tts-1": self.custom_voice_model_path
-            if self.default_model_size == "small"
-            else self.custom_voice_large_model_path,
+            "tts-1": (
+                self.custom_voice_model_path
+                if self.default_model_size == "small"
+                else self.custom_voice_large_model_path
+            ),
             "tts-1-hd": self.voice_design_model_path,
             # Generic aliases that respect default_model_size
             "base": getattr(self, f"base{size_suffix}_model_path"),

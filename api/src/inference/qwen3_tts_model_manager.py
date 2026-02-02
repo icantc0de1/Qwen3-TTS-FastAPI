@@ -163,11 +163,13 @@ class Qwen3ModelManager:
             # Load new model
             logger.info(f"Loading model from {model_path} on {target_device}")
             try:
+                from api.src.core.config import settings
+
                 model = Qwen3TTSModel.from_pretrained(
                     model_path,
                     device_map=target_device,
                     dtype=self._dtype,
-                    attn_implementation="eager",
+                    attn_implementation=settings.attention_backend,
                 )
 
                 # Create cache entry
@@ -418,7 +420,9 @@ class Qwen3ModelManager:
                 "device": entry.device,
                 "refs": entry.ref_count,
                 "idle_time": current_time - entry.last_accessed,
-                "model_size": entry.model.tts_model_size
-                if hasattr(entry.model, "tts_model_size")
-                else "unknown",
+                "model_size": (
+                    entry.model.tts_model_size
+                    if hasattr(entry.model, "tts_model_size")
+                    else "unknown"
+                ),
             }
