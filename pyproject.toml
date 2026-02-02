@@ -56,25 +56,45 @@ packages = ["api"]
 [tool.black]
 line-length = 88
 target-version = ["py312"]
+force-exclude = "api/src/core/models/(modeling|configuration|processing)_qwen3_tts\\.py|api/src/core/models/__init__\\.py|api/src/core/tokenizer_(12hz|25hz)/.*|api/src/core/__init__\\.py|api/src/services/text_processing/(normalizer|__init__)\\.py|api/src/inference/qwen3_tts_(tokenizer|model)\\.py"
 
 [tool.ruff]
 line-length = 88
 target-version = "py312"
+exclude = [
+    "api/src/core/__init__.py",
+    "api/src/core/models/__init__.py",
+    "api/src/core/models/modeling_qwen3_tts.py",
+    "api/src/core/models/configuration_qwen3_tts.py",
+    "api/src/core/models/processing_qwen3_tts.py",
+    "api/src/core/tokenizer_12hz",
+    "api/src/core/tokenizer_25hz",
+    "api/src/services/text_processing/__init__.py",
+    "api/src/services/text_processing/normalizer.py",
+    "api/src/inference/qwen3_tts_tokenizer.py",
+    "api/src/inference/qwen3_tts_model.py",
+]
 
 [tool.mypy]
 python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+explicit_package_bases = true
 
 # Files to exclude from type checking (vendored/third-party code we don't modify)
 exclude = [
+    "api/src/core/__init__.py",
+    "api/src/core/models/__init__.py",
     "api/src/core/models/modeling_qwen3_tts.py",
     "api/src/core/models/configuration_qwen3_tts.py",
     "api/src/core/models/processing_qwen3_tts.py",
     "api/src/core/tokenizer_12hz",
     "api/src/core/tokenizer_25hz",
+    "api/src/services/text_processing/__init__.py",
     "api/src/services/text_processing/normalizer.py",
+    "api/src/inference/qwen3_tts_tokenizer.py",
+    "api/src/inference/qwen3_tts_model.py",
 ]
 
 # Suppress errors for third-party libraries without type stubs
@@ -96,6 +116,20 @@ module = [
 ]
 ignore_missing_imports = true
 follow_imports = "skip"
+
+# Ignore type errors in vendored code we don't modify
+[[tool.mypy.overrides]]
+module = [
+    "api.src.core.models.modeling_qwen3_tts",
+    "api.src.core.models.configuration_qwen3_tts",
+    "api.src.core.models.processing_qwen3_tts",
+    "api.src.core.tokenizer_12hz.*",
+    "api.src.core.tokenizer_25hz.*",
+    "api.src.services.text_processing.normalizer",
+    "api.src.inference.qwen3_tts_tokenizer",
+    "api.src.inference.qwen3_tts_model",
+]
+ignore_errors = true
 
 [tool.uv]
 # Use PyTorch CUDA 13 wheels

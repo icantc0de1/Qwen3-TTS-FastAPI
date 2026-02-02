@@ -368,6 +368,8 @@ Key dependencies (see `pyproject.toml` for full list):
 ### Modifying Vendored Code
 
 **DO NOT MODIFY** files in:
+- `api/src/inference/qwen3_tts_tokenizer.py`
+- `api/src/inference/qwen3_tts_model.py`
 - `api/src/core/models/modeling_qwen3_tts.py`
 - `api/src/core/models/configuration_qwen3_tts.py`
 - `api/src/core/models/processing_qwen3_tts.py`

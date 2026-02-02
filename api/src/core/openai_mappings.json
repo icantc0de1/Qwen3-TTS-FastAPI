@@ -1,7 +1,7 @@
 {
     "models": {
-        "tts-1": "qwen3-tts-12hz-1.7b-custom-voice",
-        "tts-1-hd": "qwen3-tts-12hz-1.7b-voice-design",
+        "tts-1": "qwen3-tts-12hz-0.6b-custom-voice",
+        "tts-1-hd": "qwen3-tts-12hz-1.7b-custom-voice",
         "qwen3-12hz-1.7b-custom-voice": "qwen3-tts-12hz-1.7b-custom-voice",
         "qwen3-12hz-1.7b-voice-design": "qwen3-tts-12hz-1.7b-voice-design",
         "qwen3-12hz-1.7b-base": "qwen3-tts-12hz-1.7b-base",
