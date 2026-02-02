@@ -73,7 +73,10 @@ class OpenAISpeechRequest(BaseModel):
 
     model: str = Field(
         default="tts-1",
-        description="Model ID for TTS generation",
+        description="Model ID for TTS generation. Determines generation method: "
+        "custom-voice models use 'voice' parameter, "
+        "voice-design models use 'instruct' parameter, "
+        "base models require 'ref_audio' for voice cloning.",
         examples=["tts-1", "tts-1-hd", "qwen3-tts-12hz-1.7b-custom-voice"],
     )
     input: str = Field(
@@ -84,7 +87,9 @@ class OpenAISpeechRequest(BaseModel):
     )
     voice: str = Field(
         default="alloy",
-        description="Voice identifier (OpenAI aliases mapped to Qwen3 speakers)",
+        description="Voice/speaker identifier for custom_voice models. "
+        "OpenAI aliases (alloy, echo, etc.) mapped to Qwen3 speakers. "
+        "Required for custom_voice models, ignored by voice_design.",
     )
     response_format: Literal["mp3", "opus", "aac", "flac", "wav", "pcm"] = Field(
         default="mp3",
@@ -99,23 +104,28 @@ class OpenAISpeechRequest(BaseModel):
     # Qwen3-specific optional fields
     language: Optional[str] = Field(
         default=None,
-        description="Language code (e.g., 'en', 'zh', 'ja')",
+        description="Language (e.g., 'English', 'Chinese')",
     )
     speaker: Optional[str] = Field(
         default=None,
-        description="Speaker name for custom_voice models",
+        description="Optional: Direct speaker name override for custom_voice models. "
+        "If provided, takes precedence over 'voice' field.",
     )
     instruct: Optional[str] = Field(
         default=None,
-        description="Voice design instruction for voice_design models",
+        description="Voice instruction. Required for voice_design models. "
+        "Optional for custom_voice models (modifies tone/emotion). "
+        "Example: 'Very happy' or 'A young female voice with warm tone'",
     )
     ref_audio: Optional[str] = Field(
         default=None,
-        description="Base64-encoded reference audio for voice_clone models",
+        description="Base64-encoded reference audio for base model voice cloning. "
+        "Required when using base models for voice cloning.",
     )
     ref_text: Optional[str] = Field(
         default=None,
-        description="Reference text for voice_clone ICL mode",
+        description="Reference text for base model voice cloning ICL mode. "
+        "Optional: provide transcript of reference audio for better cloning.",
     )
     normalization_options: Optional[NormalizationOptions] = Field(
         default=None,

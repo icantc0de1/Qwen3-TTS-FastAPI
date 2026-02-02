@@ -163,26 +163,22 @@ class Qwen3TTSService:
         """
         return self._voice_mappings.get(voice_id, voice_id)
 
-    def _determine_generation_mode(
-        self, request: OpenAISpeechRequest
-    ) -> VoiceModelType:
-        """Determine which generation mode to use based on request.
+    def _get_model_type_from_path(self, model_path: str) -> VoiceModelType:
+        """Determine model type from path.
 
         Args:
-            request: The speech request
+            model_path: Path to the model directory
 
         Returns:
-            Appropriate VoiceModelType
+            VoiceModelType based on path contents
         """
-        if request.ref_audio:
-            return VoiceModelType.BASE
-        elif request.speaker:
-            return VoiceModelType.CUSTOM_VOICE
-        elif request.instruct:
+        path_lower = model_path.lower()
+        if "voice-design" in path_lower or "voice_design" in path_lower:
             return VoiceModelType.VOICE_DESIGN
-        else:
-            # Default to custom voice if voice is specified
+        elif "custom-voice" in path_lower or "custom_voice" in path_lower:
             return VoiceModelType.CUSTOM_VOICE
+        else:
+            return VoiceModelType.BASE
 
     async def generate_speech(
         self,
@@ -215,9 +211,9 @@ class Qwen3TTSService:
             f"voice={request.voice}, format={request.response_format}"
         )
 
-        # Determine generation mode
-        mode = self._determine_generation_mode(request)
-        logger.debug(f"Generation mode: {mode.value}")
+        # Determine model type from path
+        model_type = self._get_model_type_from_path(model_path)
+        logger.info(f"Model type: {model_type.value}")
 
         # Resolve voice to speaker name
         speaker = self._resolve_voice(request.voice)
@@ -236,9 +232,14 @@ class Qwen3TTSService:
         }
 
         try:
-            # Route to appropriate backend method
-            if mode == VoiceModelType.BASE and request.ref_audio:
-                # Voice cloning mode
+            # Route directly by model type from path
+            if model_type == VoiceModelType.BASE:
+                # Voice cloning mode - requires ref_audio
+                if not request.ref_audio:
+                    raise ValueError(
+                        "Base model requires 'ref_audio' for voice cloning. "
+                        "Provide reference audio or use a custom-voice/voice-design model."
+                    )
                 chunks = self.backend.voice_clone(
                     text=normalized_text,
                     model_path=model_path,
@@ -248,8 +249,13 @@ class Qwen3TTSService:
                     **gen_kwargs,
                 )
 
-            elif mode == VoiceModelType.VOICE_DESIGN and request.instruct:
-                # Voice design mode
+            elif model_type == VoiceModelType.VOICE_DESIGN:
+                # Voice design mode - requires instruct
+                if not request.instruct:
+                    raise ValueError(
+                        "Voice design model requires 'instruct' parameter. "
+                        "Example: 'A young female voice with warm tone'"
+                    )
                 chunks = self.backend.voice_design(
                     text=normalized_text,
                     model_path=model_path,
@@ -258,8 +264,8 @@ class Qwen3TTSService:
                     **gen_kwargs,
                 )
 
-            else:
-                # Default to custom voice mode
+            elif model_type == VoiceModelType.CUSTOM_VOICE:
+                # Custom voice mode - speaker required, instruct optional
                 chunks = self.backend.custom_voice(
                     text=normalized_text,
                     model_path=model_path,
@@ -268,6 +274,9 @@ class Qwen3TTSService:
                     instruct=request.instruct,
                     **gen_kwargs,
                 )
+
+            else:
+                raise ValueError(f"Unknown model type: {model_type}")
 
             # Process and encode audio chunks
             total_duration_ms = 0
@@ -416,10 +425,10 @@ class Qwen3TTSService:
         if not model_path:
             raise ValueError(f"Unknown model: {request.model}")
 
-        # Validate voice/speaker compatibility
-        mode = self._determine_generation_mode(request)
+        # Get model type from path for compatibility checks
+        model_type = self._get_model_type_from_path(model_path)
 
-        if mode == VoiceModelType.CUSTOM_VOICE:
+        if model_type == VoiceModelType.CUSTOM_VOICE:
             # Check if speaker is supported
             speaker = self._resolve_voice(request.voice)
             supported_speakers = self.backend.get_supported_speakers(model_path)
