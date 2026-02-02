@@ -299,11 +299,12 @@ Configuration is loaded from environment variables with `TTS_` prefix:
 
 ```bash
 # Core settings
-export TTS_IDLE_TIMEOUT=300              # Seconds to unload idle models (default: 300)
-export TTS_CLEANUP_INTERVAL=30           # Cleanup check interval in seconds (default: 30)
+export TTS_IDLE_TIMEOUT=600              # Seconds to unload idle models (default: 600)
+export TTS_CLEANUP_INTERVAL=60           # Cleanup check interval in seconds (default: 60)
 export TTS_CLEANUP_ENABLED=true          # Enable background cleanup worker (default: true)
 export TTS_DEFAULT_DEVICE=cuda           # Default device: cuda or cpu (default: cuda)
-export TTS_DEFAULT_MODEL_SIZE=1.7B       # Default model size: 0.6B or 1.7B (default: 1.7B)
+export TTS_DEFAULT_MODEL_SIZE=small      # Default model size: small (0.6B) or large (1.7B)
+export TTS_ATTENTION_BACKEND=sdpa        # Attention backend: eager, sdpa, or flash_attention_2
 ```
 
 ### Settings Reference
@@ -318,7 +319,8 @@ export TTS_DEFAULT_MODEL_SIZE=1.7B       # Default model size: 0.6B or 1.7B (def
 - `cleanup_interval`: Seconds between cleanup worker checks
 - `cleanup_enabled`: Whether the background cleanup worker runs
 - `default_device`: Default compute device ("cuda" or "cpu")
-- `default_model_size`: Default model variant ("0.6B" or "1.7B")
+- `default_model_size`: Default model variant ("small"=0.6B or "large"=1.7B)
+- `attention_backend`: Attention implementation ("eager", "sdpa", or "flash_attention_2")
 
 See [config documentation](CORE_CONFIG_DOCS.md) for details.
 

@@ -80,7 +80,32 @@ cp .env.example .env
 | `IDLE_TIMEOUT` | `600` | Seconds before unloading an idle model (0 to disable) |
 | `CLEANUP_INTERVAL` | `60` | How often to check for idle models (seconds) |
 | `DEFAULT_DEVICE` | `cuda` | `cuda` or `cpu` |
-| `DEFAULT_MODEL_SIZE`| `small` | `small` (0.6B) or `large` (1.7B) |
+| `DEFAULT_MODEL_SIZE` | `small` | `small` (0.6B) or `large` (1.7B) |
+| `ATTENTION_BACKEND` | `sdpa` | Attention implementation: `eager`, `sdpa`, or `flash_attention_2` |
+
+### Model & Voice Mappings
+
+The API supports OpenAI-compatible model IDs and voice names that map to Qwen3-TTS models and speakers:
+
+**Models:**
+| OpenAI Model ID | Qwen3-TTS Model | Size | Description |
+|-----------------|-----------------|------|-------------|
+| `tts-1` | `qwen3-tts-12hz-0.6b-custom-voice` | 0.6B | Default OpenAI-compatible model |
+| `tts-1-hd` | `qwen3-tts-12hz-1.7b-custom-voice` | 1.7B | Higher quality variant |
+| `tts-1` (with `DEFAULT_MODEL_SIZE=large`) | `qwen3-tts-12hz-1.7b-custom-voice` | 1.7B | Large model when size is set to large |
+
+**Voices:**
+| OpenAI Voice | Qwen3 Speaker | Gender |
+|--------------|---------------|--------|
+| `alloy` | Vivian | Female |
+| `ash` | Serena | Female |
+| `coral` | Uncle_Fu | Male |
+| `echo` | Dylan | Male |
+| `fable` | Eric | Male |
+| `onyx` | Ryan | Male |
+| `nova` | Aiden | Male |
+| `sage` | Ono_Anna | Female |
+| `shimmer` | Sohee | Female |
 
 ## Usage
 
