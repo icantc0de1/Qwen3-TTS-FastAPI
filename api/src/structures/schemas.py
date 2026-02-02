@@ -20,6 +20,20 @@ class VoiceModelType(str, Enum):
     CUSTOM_VOICE = "custom_voice"
 
 
+class StreamingMode(str, Enum):
+    """Streaming mode for TTS generation.
+
+    Controls how audio is chunked for streaming delivery:
+    - FULL: Generate complete audio first, then deliver (no streaming)
+    - SENTENCE: Split text by sentences, stream each as completed
+    - CHUNK: Split text by fixed character count with overlap
+    """
+
+    FULL = "full"
+    SENTENCE = "sentence"
+    CHUNK = "chunk"
+
+
 class NormalizationOptions(BaseModel):
     """Options for the normalization system"""
 
@@ -130,6 +144,21 @@ class OpenAISpeechRequest(BaseModel):
     normalization_options: Optional[NormalizationOptions] = Field(
         default=None,
         description="Optional text normalization settings. If not provided, text will be normalized with default settings.",
+    )
+    streaming_mode: Optional[StreamingMode] = Field(
+        default=StreamingMode.SENTENCE,
+        description="Streaming mode for audio generation. "
+        "'full': Generate complete audio first (no streaming). "
+        "'sentence': Split by sentences for true streaming (default). "
+        "'chunk': Split by fixed character count with overlap.",
+    )
+    chunk_size: Optional[int] = Field(
+        default=None,
+        ge=50,
+        le=1000,
+        description="Maximum characters per chunk for streaming. "
+        "For 'sentence' mode: max sentence length before forced split. "
+        "For 'chunk' mode: target characters per chunk. Default: 300 (sentence), 200 (chunk)",
     )
 
     @field_validator("input")

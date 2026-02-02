@@ -9,10 +9,15 @@ from loguru import logger
 
 from api.src.core.config import settings
 from api.src.inference.qwen3_tts_backend import AudioChunk, Qwen3TTSBackend
-from api.src.services.text_processing import normalize_text
+from api.src.services.text_processing import (
+    normalize_text,
+    split_into_sentences,
+    split_into_chunks,
+)
 from api.src.structures.schemas import (
     NormalizationOptions,
     OpenAISpeechRequest,
+    StreamingMode,
     VoiceInfo,
     VoiceModelType,
 )
@@ -208,7 +213,8 @@ class Qwen3TTSService:
         model_path = self._resolve_model(request.model)
         logger.info(
             f"Speech generation: model={request.model} -> {model_path}, "
-            f"voice={request.voice}, format={request.response_format}"
+            f"voice={request.voice}, format={request.response_format}, "
+            f"streaming={request.streaming_mode.value if request.streaming_mode else 'full'}"
         )
 
         # Determine model type from path
@@ -224,99 +230,113 @@ class Qwen3TTSService:
         )
 
         # Common generation kwargs
-        gen_kwargs = {
+        gen_kwargs: dict = {
             "temperature": max(0.1, min(1.0, 0.9 / request.speed)),
             "top_p": 1.0,
             "top_k": 50,
             "max_new_tokens": 2048,
         }
 
-        try:
-            # Route directly by model type from path
-            if model_type == VoiceModelType.BASE:
-                # Voice cloning mode - requires ref_audio
-                if not request.ref_audio:
-                    raise ValueError(
-                        "Base model requires 'ref_audio' for voice cloning. "
-                        "Provide reference audio or use a custom-voice/voice-design model."
+        streaming_mode = request.streaming_mode or StreamingMode.SENTENCE
+        chunk_size = request.chunk_size or (
+            300 if streaming_mode == StreamingMode.SENTENCE else 200
+        )
+
+        async def _generate_for_text(
+            text: str,
+            is_last: bool = False,
+            chunk_index: int = 0,
+        ) -> AsyncGenerator[AudioChunk, None]:
+            """Generate audio for a single text chunk."""
+            try:
+                if model_type == VoiceModelType.BASE:
+                    if not request.ref_audio:
+                        raise ValueError(
+                            "Base model requires 'ref_audio' for voice cloning."
+                        )
+                    backend_gen = self.backend.voice_clone(
+                        text=text,
+                        model_path=model_path,
+                        ref_audio=request.ref_audio,
+                        ref_text=request.ref_text,
+                        language=request.language,
+                        **gen_kwargs,
                     )
-                chunks = self.backend.voice_clone(
-                    text=normalized_text,
-                    model_path=model_path,
-                    ref_audio=request.ref_audio,
-                    ref_text=request.ref_text,
-                    language=request.language,
-                    **gen_kwargs,
-                )
-
-            elif model_type == VoiceModelType.VOICE_DESIGN:
-                # Voice design mode - requires instruct
-                if not request.instruct:
-                    raise ValueError(
-                        "Voice design model requires 'instruct' parameter. "
-                        "Example: 'A young female voice with warm tone'"
+                elif model_type == VoiceModelType.VOICE_DESIGN:
+                    if not request.instruct:
+                        raise ValueError(
+                            "Voice design model requires 'instruct' parameter."
+                        )
+                    backend_gen = self.backend.voice_design(
+                        text=text,
+                        model_path=model_path,
+                        instruct=request.instruct,
+                        language=request.language,
+                        **gen_kwargs,
                     )
-                chunks = self.backend.voice_design(
-                    text=normalized_text,
-                    model_path=model_path,
-                    instruct=request.instruct,
-                    language=request.language,
-                    **gen_kwargs,
-                )
+                elif model_type == VoiceModelType.CUSTOM_VOICE:
+                    backend_gen = self.backend.custom_voice(
+                        text=text,
+                        model_path=model_path,
+                        speaker=speaker,
+                        language=request.language,
+                        instruct=request.instruct,
+                        **gen_kwargs,
+                    )
+                else:
+                    raise ValueError(f"Unknown model type: {model_type}")
 
-            elif model_type == VoiceModelType.CUSTOM_VOICE:
-                # Custom voice mode - speaker required, instruct optional
-                chunks = self.backend.custom_voice(
-                    text=normalized_text,
-                    model_path=model_path,
-                    speaker=speaker,
-                    language=request.language,
-                    instruct=request.instruct,
-                    **gen_kwargs,
-                )
+                async for chunk in backend_gen:
+                    if isinstance(chunk.data, np.ndarray):
+                        encoded_bytes = self.backend.encode_audio(
+                            chunk.data,
+                            chunk.sample_rate,
+                            format=request.response_format,
+                        )
+                    else:
+                        encoded_bytes = chunk.data
 
-            else:
-                raise ValueError(f"Unknown model type: {model_type}")
-
-            # Process and encode audio chunks
-            total_duration_ms = 0
-            chunk_count = 0
-
-            async for chunk in chunks:
-                chunk_count += 1
-
-                # Encode to requested format
-                if isinstance(chunk.data, np.ndarray):
-                    encoded_bytes = self.backend.encode_audio(
-                        chunk.data,
-                        chunk.sample_rate,
+                    yield AudioChunk(
+                        data=encoded_bytes,
+                        sample_rate=chunk.sample_rate,
+                        is_last=is_last,
                         format=request.response_format,
+                        timestamp_ms=chunk.timestamp_ms,
+                    )
+            except Exception as e:
+                logger.error(f"Failed to generate audio for chunk {chunk_index}: {e}")
+                raise
+
+        try:
+            if streaming_mode == StreamingMode.FULL:
+                async for chunk in _generate_for_text(normalized_text, is_last=True):
+                    yield chunk
+            else:
+                if streaming_mode == StreamingMode.SENTENCE:
+                    text_chunks = split_into_sentences(
+                        normalized_text, max_length=chunk_size
                     )
                 else:
-                    encoded_bytes = chunk.data
+                    text_chunks = split_into_chunks(
+                        normalized_text, max_chars=chunk_size
+                    )
 
-                # Calculate duration
-                if isinstance(chunk.data, np.ndarray):
-                    duration_ms = int(len(chunk.data) / chunk.sample_rate * 1000)
-                else:
-                    # Estimate based on format (rough approximation)
-                    duration_ms = len(encoded_bytes) // 32  # ~32 bytes/ms for mp3
+                if not text_chunks:
+                    text_chunks = [normalized_text]
 
-                total_duration_ms += duration_ms
-
-                yield AudioChunk(
-                    data=encoded_bytes,
-                    sample_rate=chunk.sample_rate,
-                    is_last=chunk.is_last,
-                    format=request.response_format,
-                    timestamp_ms=chunk.timestamp_ms,
-                )
+                total_chunks = len(text_chunks)
+                for i, text_chunk in enumerate(text_chunks):
+                    is_last = i == total_chunks - 1
+                    logger.debug(
+                        f"Generating chunk {i + 1}/{total_chunks}: '{text_chunk[:50]}...'"
+                    )
+                    async for chunk in _generate_for_text(
+                        text_chunk, is_last=is_last, chunk_index=i
+                    ):
+                        yield chunk
 
             elapsed = time.time() - start_time
-            logger.info(
-                f"Generation complete: {chunk_count} chunks, "
-                f"{total_duration_ms}ms audio, {elapsed:.2f}s elapsed"
-            )
+            logger.info(f"Generation complete in {elapsed:.2f}s")
 
         except Exception as e:
             logger.error(f"Speech generation failed: {e}")
