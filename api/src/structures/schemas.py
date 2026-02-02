@@ -158,7 +158,7 @@ class OpenAISpeechRequest(BaseModel):
         le=1000,
         description="Maximum characters per chunk for streaming. "
         "For 'sentence' mode: max sentence length before forced split. "
-        "For 'chunk' mode: target characters per chunk. Default: 300 (sentence), 200 (chunk)",
+        "For 'chunk' mode: target characters per chunk. Default: 150 (sentence), 200 (chunk)",
     )
 
     @field_validator("input")

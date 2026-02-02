@@ -239,7 +239,7 @@ class Qwen3TTSService:
 
         streaming_mode = request.streaming_mode or StreamingMode.SENTENCE
         chunk_size = request.chunk_size or (
-            300 if streaming_mode == StreamingMode.SENTENCE else 200
+            150 if streaming_mode == StreamingMode.SENTENCE else 200
         )
 
         async def _generate_for_text(
