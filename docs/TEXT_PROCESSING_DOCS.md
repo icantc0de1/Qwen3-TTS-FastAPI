@@ -245,6 +245,123 @@ Input:  "Cost is $50 @ store"
 Output: "Cost is fifty dollars at store"
 ```
 
+## Text Segmentation
+
+The text processing module provides utilities for splitting text into segments for streaming TTS generation.
+
+### 1. split_into_sentences()
+
+**Purpose**: Split text into sentences for streaming TTS generation.
+
+**Features**:
+- Smart sentence boundary detection with regex
+- Handles common abbreviations (Mr., Dr., Mrs., etc.)
+- Processes decimal numbers (3.14) correctly
+- Converts CJK punctuation to standard sentence endings
+- Combines very short sentences with next sentence
+- Enforces maximum sentence length to prevent overly long chunks
+
+**Signature**:
+```python
+def split_into_sentences(
+    text: str, 
+    max_length: int = 300, 
+    min_length: int = 10
+) -> List[str]
+```
+
+**Parameters**:
+- `text`: Input text to split
+- `max_length`: Maximum characters per sentence (default: 300)
+- `min_length`: Minimum characters per sentence (default: 10)
+
+**Examples**:
+```python
+from api.src.services.text_processing import split_into_sentences
+
+# Basic sentence splitting
+text = "Hello world! How are you? I'm fine."
+sentences = split_into_sentences(text)
+# Result: ['Hello world!', 'How are you?', "I'm fine."]
+
+# With abbreviations (preserves Dr., Mr., etc.)
+text = "Dr. Smith arrived. He was late."
+sentences = split_into_sentences(text)
+# Result: ['Dr. Smith arrived.', 'He was late.']
+
+# CJK punctuation support
+text = "你好世界！你好吗？我很好。"
+sentences = split_into_sentences(text)
+# Result: ['你好世界!', '你好吗?', '我很好.']
+
+# Length control
+text = "This is a very long sentence that exceeds the maximum length limit and should be split appropriately."
+sentences = split_into_sentences(text, max_length=50)
+# Result: ['This is a very long sentence that', 'exceeds the maximum length limit and', 'should be split appropriately.']
+```
+
+### 2. split_into_chunks()
+
+**Purpose**: Split text into overlapping chunks for streaming TTS.
+
+**Features**:
+- Fixed-size chunking with overlap for smooth transitions
+- Configurable chunk size and overlap amount
+- Minimum chunk length enforcement
+- Smart word boundary detection to avoid mid-word splits
+
+**Signature**:
+```python
+def split_into_chunks(
+    text: str,
+    max_chars: int = 200,
+    overlap: int = 20,
+    min_chunk_len: int = 30,
+) -> List[str]
+```
+
+**Parameters**:
+- `text`: Input text to split
+- `max_chars`: Maximum characters per chunk (default: 200)
+- `overlap`: Number of characters to overlap between chunks (default: 20)
+- `min_chunk_len`: Minimum chunk length (default: 30)
+
+**Examples**:
+```python
+from api.src.services.text_processing import split_into_chunks
+
+# Basic chunking
+text = "This is a very long sentence that needs to be split into smaller chunks for streaming."
+chunks = split_into_chunks(text, max_chars=150, overlap=15)
+# Result: [
+#   'This is a very long sentence that needs to be split into smaller',
+#   'split into smaller chunks for streaming.'
+# ]
+
+# Very long text
+text = "Chunk one. " * 20  # 20 repetitions
+chunks = split_into_chunks(text, max_chars=100, overlap=10)
+# Multiple overlapping chunks of ~100 characters each
+
+# Edge cases
+short_text = "Short text only."
+chunks = split_into_chunks(short_text)
+# Result: ['Short text only.']
+```
+
+### Usage in Streaming TTS
+
+These segmentation functions are automatically used by `Qwen3TTSService` based on the `streaming_mode` parameter:
+
+- `StreamingMode.SENTENCE`: Uses `split_into_sentences()`
+- `StreamingMode.CHUNK`: Uses `split_into_chunks()`
+- `StreamingMode.FULL`: No segmentation, processes entire text
+
+**Integration Flow**:
+```
+Text Input → Normalization → Segmentation (based on streaming_mode) → TTS Generation → Audio Chunks
+```
+
 ## Integration with TTS Service
 
 ### Automatic Normalization

@@ -136,28 +136,62 @@ async def generate_speech(
 1. Resolve model path from request.model
 2. Determine generation mode from request parameters
 3. Map OpenAI voice to Qwen3 speaker
-4. Call appropriate backend method
-5. Encode audio chunks to requested format
-6. Yield formatted AudioChunk objects
+4. Normalize input text for better pronunciation
+5. Apply text segmentation based on streaming mode
+6. Call appropriate backend method for each text segment
+7. Encode audio chunks to requested format
+8. Yield formatted AudioChunk objects
+
+**Streaming Support**:
+The service supports three streaming modes controlled by `request.streaming_mode`:
+
+- **FULL**: Generates complete audio for the entire text before yielding any chunks
+  - Lowest latency for short texts
+  - Best quality across sentence boundaries
+  
+- **SENTENCE**: Splits text by sentence boundaries and streams each as completed
+  - Default mode (StreamingMode.SENTENCE)
+  - Natural streaming experience with smart sentence detection
+  - Handles abbreviations, decimals, CJK punctuation
+  
+- **CHUNK**: Splits text by fixed character count with overlap
+  - Customizable chunk sizes via `request.chunk_size`
+  - Overlap ensures smooth audio transitions
+  - Best for very long texts
 
 **Example**:
 ```python
+# Sentence-level streaming (default)
 request = OpenAISpeechRequest(
     model="tts-1",
-    input="Hello, world!",
+    input="First sentence. Second sentence. Third sentence.",
     voice="alloy",
-    response_format="mp3"
+    response_format="mp3",
+    streaming_mode=StreamingMode.SENTENCE
 )
 
 async for chunk in service.generate_speech(request):
     # chunk.data contains MP3-encoded bytes
+    # chunk.is_last indicates final chunk
     save_to_file(chunk.data)
+
+# Fixed-size chunk streaming
+chunk_request = OpenAISpeechRequest(
+    model="tts-1",
+    input="This is a very long text...",
+    voice="alloy", 
+    response_format="mp3",
+    streaming_mode=StreamingMode.CHUNK,
+    chunk_size=200  # 200 characters per chunk
+)
 ```
 
 **Performance Characteristics**:
-- First chunk latency: 1-5 seconds (generation time)
-- Subsequent chunks: Streaming as available
-- Total time: Depends on text length and model size
+- **FULL mode**: First chunk latency = total generation time
+- **SENTENCE mode**: First chunk latency = first sentence generation time
+- **CHUNK mode**: First chunk latency = first chunk generation time
+- Subsequent chunks: Streamed as available
+- Total time: Depends on text length, model size, and streaming mode
 
 #### get_available_models()
 

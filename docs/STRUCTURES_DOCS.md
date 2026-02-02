@@ -48,7 +48,50 @@ if model_type == VoiceModelType.VOICE_DESIGN:
     pass
 ```
 
-### 2. OpenAISpeechRequest (Pydantic Model)
+### 2. StreamingMode (Enum)
+
+**Purpose**: Controls how audio is chunked for streaming delivery.
+
+**Values**:
+- `FULL` ("full"): Generate complete audio first, then deliver (no streaming)
+  - Best for short text or when latency is not critical
+  - Provides highest quality across sentence boundaries
+  
+- `SENTENCE` ("sentence"): Split text by sentences, stream each as completed
+  - Default mode for natural streaming experience
+  - Smart sentence boundary detection with abbreviation handling
+  - Preserves context within sentences
+  
+- `CHUNK` ("chunk"): Split text by fixed character count with overlap
+  - More granular control over chunk sizes
+  - Overlap ensures smooth transitions between chunks
+  - Best for very long texts or custom latency requirements
+
+**Usage**:
+```python
+from api.src.structures.schemas import StreamingMode, OpenAISpeechRequest
+
+# Sentence-level streaming (default)
+request = OpenAISpeechRequest(
+    input="This is sentence one. This is sentence two. This is sentence three.",
+    streaming_mode=StreamingMode.SENTENCE
+)
+
+# Fixed-size chunk streaming
+request = OpenAISpeechRequest(
+    input="This is a very long text that will be split into fixed-size chunks.",
+    streaming_mode=StreamingMode.CHUNK,
+    chunk_size=200
+)
+
+# No streaming
+request = OpenAISpeechRequest(
+    input="Short text.",
+    streaming_mode=StreamingMode.FULL
+)
+```
+
+### 3. OpenAISpeechRequest (Pydantic Model)
 
 **Purpose**: Validates and structures OpenAI-compatible TTS requests.
 
@@ -57,6 +100,7 @@ if model_type == VoiceModelType.VOICE_DESIGN:
 - Qwen3-specific extensions (language, speaker, instruct, ref_audio, ref_text)
 - Automatic validation of input text (non-empty, max 4096 chars)
 - Speed validation (0.25x to 4.0x range)
+- Streaming audio generation with multiple segmentation modes
 
 **Fields**:
 
@@ -72,6 +116,8 @@ if model_type == VoiceModelType.VOICE_DESIGN:
 | instruct | Optional[str] | None | Voice design instruction |
 | ref_audio | Optional[str] | None | Base64 reference audio |
 | ref_text | Optional[str] | None | Reference text for ICL mode |
+| streaming_mode | Optional[StreamingMode] | SENTENCE | Audio streaming mode (full, sentence, chunk) |
+| chunk_size | Optional[int] | None | Max chars per chunk (default: 300 for sentence, 200 for chunk) |
 
 **Validation Logic**:
 - `input`: Strips whitespace, validates non-empty after stripping
@@ -81,7 +127,7 @@ if model_type == VoiceModelType.VOICE_DESIGN:
 ```python
 from api.src.structures.schemas import OpenAISpeechRequest
 
-# Valid request
+# Basic request
 request = OpenAISpeechRequest(
     model="tts-1",
     input="Hello, world!",
@@ -89,9 +135,30 @@ request = OpenAISpeechRequest(
     response_format="mp3"
 )
 
+# Streaming request with sentence-level splitting
+streaming_request = OpenAISpeechRequest(
+    model="tts-1",
+    input="This is the first sentence. This is the second sentence. And this is the third.",
+    voice="alloy",
+    response_format="mp3",
+    streaming_mode=StreamingMode.SENTENCE,
+    chunk_size=200
+)
+
+# Fixed-size chunk streaming for long text
+chunk_request = OpenAISpeechRequest(
+    model="tts-1",
+    input="This is a very long text that will be split into fixed-size overlapping chunks for streaming delivery.",
+    voice="alloy",
+    response_format="mp3",
+    streaming_mode=StreamingMode.CHUNK,
+    chunk_size=150
+)
+
 # Access validated data
 print(request.input)  # "Hello, world!"
 print(request.speed)  # 1.0
+print(streaming_request.streaming_mode)  # StreamingMode.SENTENCE
 
 # Invalid request raises ValidationError
 try:
@@ -100,7 +167,7 @@ except ValueError as e:
     print(e)  # "Input text cannot be empty or whitespace-only"
 ```
 
-### 3. Supporting Response Models
+### 4. Supporting Response Models
 
 **SpeechResponse**: Returned after successful speech generation
 - `audio`: Base64-encoded audio data
