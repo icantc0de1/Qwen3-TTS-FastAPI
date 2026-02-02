@@ -8,7 +8,6 @@ from fastapi.responses import StreamingResponse
 from loguru import logger
 from pydantic import BaseModel
 
-from api.src.inference.qwen3_tts_backend import Qwen3TTSBackend
 from api.src.services.qwen3_tts_service import Qwen3TTSService
 from api.src.structures.schemas import (
     ModelsListResponse,
@@ -120,27 +119,32 @@ async def create_speech(
             chunk_count = 0
             total_bytes = 0
 
-            async for chunk in service.generate_speech(request):
-                chunk_count += 1
+            try:
+                async for chunk in service.generate_speech(request):
+                    chunk_count += 1
 
-                if isinstance(chunk.data, bytes):
-                    audio_bytes = chunk.data
-                else:
-                    # Encode numpy array to requested format
-                    audio_bytes = service.backend.encode_audio(
-                        chunk.data,
-                        chunk.sample_rate,
-                        format=request.response_format,
-                    )
+                    if isinstance(chunk.data, bytes):
+                        audio_bytes = chunk.data
+                    else:
+                        # Encode numpy array to requested format
+                        audio_bytes = service.backend.encode_audio(
+                            chunk.data,
+                            chunk.sample_rate,
+                            format=request.response_format,
+                        )
 
-                total_bytes += len(audio_bytes)
-                yield audio_bytes
+                    total_bytes += len(audio_bytes)
+                    yield audio_bytes
 
-                if chunk.is_last:
-                    logger.info(
-                        f"Streaming complete: {chunk_count} chunks, "
-                        f"{total_bytes} bytes total"
-                    )
+                    if chunk.is_last:
+                        logger.info(
+                            f"Streaming complete: {chunk_count} chunks, "
+                            f"{total_bytes} bytes total"
+                        )
+            except Exception as e:
+                logger.error(f"Streaming error in chunk {chunk_count}: {e}")
+                # Re-raise so the HTTP layer can handle it
+                raise
 
         # Determine content type based on format
         content_type_map = {
@@ -156,6 +160,8 @@ async def create_speech(
             request.response_format, "application/octet-stream"
         )
 
+        logger.info(f"Returning StreamingResponse with media_type={content_type}")
+
         return StreamingResponse(
             audio_stream(),
             media_type=content_type,
@@ -163,6 +169,7 @@ async def create_speech(
                 "Content-Disposition": f'attachment; filename="speech.{request.response_format}"',
                 "X-Model": request.model,
                 "X-Voice": request.voice,
+                "Cache-Control": "no-cache",
             },
         )
 
@@ -174,7 +181,7 @@ async def create_speech(
         raise HTTPException(
             status_code=500, detail=f"Speech generation failed: {str(e)}"
         )
-    except Exception as e:
+    except Exception:
         logger.exception("Unexpected error during speech generation")
         raise HTTPException(
             status_code=500,

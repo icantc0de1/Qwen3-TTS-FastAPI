@@ -303,6 +303,7 @@ class Qwen3TTSService:
                         format=request.response_format,
                         timestamp_ms=chunk.timestamp_ms,
                     )
+
             except Exception as e:
                 logger.error(f"Failed to generate audio for chunk {chunk_index}: {e}")
                 raise
