@@ -304,7 +304,9 @@ export TTS_CLEANUP_INTERVAL=60           # Cleanup check interval in seconds (de
 export TTS_CLEANUP_ENABLED=true          # Enable background cleanup worker (default: true)
 export TTS_DEFAULT_DEVICE=cuda           # Default device: cuda or cpu (default: cuda)
 export TTS_DEFAULT_MODEL_SIZE=small      # Default model size: small (0.6B) or large (1.7B)
-export TTS_ATTENTION_BACKEND=sdpa        # Attention backend: eager, sdpa, or flash_attention_2
+export TTS_ATTENTION_BACKEND=auto        # Attention backend: 'auto' (default), eager, sdpa, or flash_attention_2
+
+# For attention backend optimization, see [config documentation](CORE_CONFIG_DOCS.md)
 ```
 
 ### Settings Reference
@@ -320,9 +322,9 @@ export TTS_ATTENTION_BACKEND=sdpa        # Attention backend: eager, sdpa, or fl
 - `cleanup_enabled`: Whether the background cleanup worker runs
 - `default_device`: Default compute device ("cuda" or "cpu")
 - `default_model_size`: Default model variant ("small"=0.6B or "large"=1.7B)
-- `attention_backend`: Attention implementation ("eager", "sdpa", or "flash_attention_2")
+- `attention_backend`: Attention implementation ('auto' for auto-detection, eager, sdpa, or flash_attention_2)
 
-See [config documentation](CORE_CONFIG_DOCS.md) for details.
+See [config documentation](CORE_CONFIG_DOCS.md) for detailed configuration options and attention backend optimization.
 
 ## Running the Application
 

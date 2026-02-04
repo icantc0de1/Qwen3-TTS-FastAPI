@@ -15,13 +15,40 @@ Example .env file:
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+import importlib.util
+import torch
+from loguru import logger
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 
 def get_project_root() -> Path:
     """Get the project root directory."""
     return Path(__file__).parent.parent.parent.parent
+
+
+def detect_fastest_attention_backend() -> str:
+    """Detect and return the fastest available attention backend.
+
+    Priority order:
+    1. flash_attention_2 - Requires flash-attn package (2-5x speedup)
+    2. sdpa - PyTorch native efficient attention (good performance)
+    3. eager - Fallback (slowest)
+
+    Returns:
+        String identifier for the fastest available backend
+    """
+    if torch.cuda.is_available():
+        if importlib.util.find_spec("flash_attn") is not None:
+            logger.info("Flash Attention 2 detected - using flash_attention_2 backend")
+            return "flash_attention_2"
+
+        if hasattr(torch.nn.attention, "SDPBackend"):
+            logger.info("PyTorch SDPA available - using sdpa backend")
+            return "sdpa"
+
+    logger.warning("CUDA not available - using eager backend")
+    return "eager"
 
 
 class Settings(BaseSettings):
@@ -55,9 +82,9 @@ class Settings(BaseSettings):
         default="small",
         description="Default model size ('small'=0.6B, 'large'=1.7B)",
     )
-    attention_backend: Literal["eager", "sdpa", "flash_attention_2"] = Field(
-        default="sdpa",
-        description="Attention implementation backend (eager, sdpa, flash_attention_2)",
+    attention_backend: Literal["auto", "eager", "sdpa", "flash_attention_2"] = Field(
+        default="auto",
+        description="Attention implementation backend ('auto' for auto-detection, eager, sdpa, flash_attention_2). Auto-detects fastest available backend at startup.",
     )
 
     # Cleanup Settings
@@ -139,6 +166,39 @@ class Settings(BaseSettings):
             return str(path_obj)
         # Relative path - resolve from project root
         return str(get_project_root() / path_obj)
+
+    @field_validator("attention_backend")
+    @classmethod
+    def validate_attention_backend(cls, v: str) -> str:
+        """Validate and resolve attention_backend setting.
+
+        If 'auto' is specified, it will be resolved at startup time.
+
+        Args:
+            v: The attention backend value
+
+        Returns:
+            The validated attention backend value
+        """
+        if v == "auto":
+            return v
+        return v
+
+    def resolve_attention_backend(self) -> str:
+        """Resolve 'auto' backend to the fastest available backend.
+
+        This method is called at application startup to determine
+        which backend to use. It performs auto-detection and
+        logs the selected backend.
+
+        Returns:
+            The resolved attention backend string
+        """
+        if self.attention_backend == "auto":
+            backend = detect_fastest_attention_backend()
+            logger.info(f"Auto-detected backend: {backend}")
+            return backend
+        return self.attention_backend
 
     class Config:
         """Pydantic configuration."""

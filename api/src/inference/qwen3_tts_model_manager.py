@@ -165,11 +165,14 @@ class Qwen3ModelManager:
             try:
                 from api.src.core.config import settings
 
+                # Resolve attention backend if set to "auto"
+                attn_backend = settings.resolve_attention_backend()
+
                 model = Qwen3TTSModel.from_pretrained(
                     model_path,
                     device_map=target_device,
                     dtype=self._dtype,
-                    attn_implementation=settings.attention_backend,
+                    attn_implementation=attn_backend,
                 )
 
                 # Create cache entry
