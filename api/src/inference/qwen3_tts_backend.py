@@ -1,6 +1,7 @@
 """Qwen3-specific backend implementation."""
 
 import io
+import random
 from dataclasses import dataclass
 from typing import AsyncGenerator, Optional
 
@@ -13,6 +14,23 @@ from api.src.inference.qwen3_tts_model import Qwen3TTSModel
 from api.src.inference.qwen3_tts_model_manager import Qwen3ModelManager
 from api.src.inference.qwen3_tts_tokenizer import Qwen3TTSTokenizer
 from api.src.structures.schemas import VoiceModelType
+
+
+def _set_seed(seed: int) -> None:
+    """Set random seed for reproducible generation.
+
+    Sets seeds for Python's random, NumPy, and PyTorch to ensure
+    consistent voice characteristics across streaming chunks.
+
+    Args:
+        seed: Random seed value (0 to 2^32-1)
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
 
 
 @dataclass
@@ -160,6 +178,7 @@ class Qwen3TTSBackend:
         ref_text: Optional[str] = None,
         language: Optional[str] = None,
         x_vector_only_mode: bool = False,
+        seed: Optional[int] = None,
         **generation_kwargs,
     ) -> AsyncGenerator[AudioChunk, None]:
         """Generate speech using voice cloning (Base model).
@@ -175,6 +194,7 @@ class Qwen3TTSBackend:
             ref_text: Reference text (required for ICL mode)
             language: Target language code
             x_vector_only_mode: Use speaker embedding only (no ICL)
+            seed: Random seed for reproducible generation
             **generation_kwargs: Additional generation parameters
                 (temperature, top_k, top_p, max_new_tokens, etc.)
 
@@ -192,6 +212,11 @@ class Qwen3TTSBackend:
 
         model = None
         try:
+            # Set seed for reproducible generation
+            if seed is not None:
+                _set_seed(seed)
+                logger.debug(f"Voice clone using seed={seed}")
+
             # Load model
             model = self.model_manager.load_model(model_path, "base")
 
@@ -240,6 +265,7 @@ class Qwen3TTSBackend:
         speaker: str,
         language: Optional[str] = None,
         instruct: Optional[str] = None,
+        seed: Optional[int] = None,
         **generation_kwargs,
     ) -> AsyncGenerator[AudioChunk, None]:
         """Generate speech using a predefined speaker (CustomVoice model).
@@ -253,6 +279,7 @@ class Qwen3TTSBackend:
             speaker: Speaker name (e.g., "Vivian", "Serena", "Dylan")
             language: Target language code
             instruct: Optional instruction for voice style (1.7B models only)
+            seed: Random seed for reproducible generation
             **generation_kwargs: Additional generation parameters
 
         Yields:
@@ -269,6 +296,11 @@ class Qwen3TTSBackend:
 
         model = None
         try:
+            # Set seed for reproducible generation
+            if seed is not None:
+                _set_seed(seed)
+                logger.debug(f"Custom voice using seed={seed}")
+
             # Load model
             model = self.model_manager.load_model(model_path, "custom_voice")
 
@@ -325,6 +357,7 @@ class Qwen3TTSBackend:
         model_path: str,
         instruct: str,
         language: Optional[str] = None,
+        seed: Optional[int] = None,
         **generation_kwargs,
     ) -> AsyncGenerator[AudioChunk, None]:
         """Generate speech using voice design (VoiceDesign model).
@@ -337,6 +370,7 @@ class Qwen3TTSBackend:
                     model_path: Path to the voice design model
                     instruct: Voice design instruction (e.g., "A young female voice with a warm tone")
                     language: Target language code
+                    seed: Random seed for reproducible generation
                     **generation_kwargs: Additional generation parameters
 
                 Yields:
@@ -352,6 +386,11 @@ class Qwen3TTSBackend:
 
         model = None
         try:
+            # Set seed for reproducible generation
+            if seed is not None:
+                _set_seed(seed)
+                logger.debug(f"Voice design using seed={seed}")
+
             # Load model
             model = self.model_manager.load_model(model_path, "voice_design")
 

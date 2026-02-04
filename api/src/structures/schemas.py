@@ -160,6 +160,14 @@ class OpenAISpeechRequest(BaseModel):
         "For 'sentence' mode: max sentence length before forced split. "
         "For 'chunk' mode: target characters per chunk. Default: 150 (sentence), 200 (chunk)",
     )
+    seed: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=2**32 - 1,
+        description="Random seed for reproducible generation. When set, ensures consistent "
+        "voice characteristics (emotion, tone, speed) across streaming chunks. "
+        "If not provided, a random seed is generated per request for session consistency.",
+    )
 
     @field_validator("input")
     @classmethod

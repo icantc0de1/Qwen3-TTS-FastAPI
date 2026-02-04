@@ -1,6 +1,7 @@
 """Qwen3 TTS service for OpenAI-compatible API."""
 
 import base64
+import random
 import time
 from typing import AsyncGenerator, Optional
 
@@ -242,6 +243,15 @@ class Qwen3TTSService:
             150 if streaming_mode == StreamingMode.SENTENCE else 200
         )
 
+        # Handle seed for consistent voice across streaming chunks
+        # If user provides a seed, use it; otherwise generate one for session consistency
+        session_seed = request.seed
+        if session_seed is None:
+            session_seed = random.randint(0, 2**32 - 1)
+            logger.debug(f"Generated session seed: {session_seed}")
+        else:
+            logger.debug(f"Using user-provided seed: {session_seed}")
+
         async def _generate_for_text(
             text: str,
             is_last: bool = False,
@@ -260,6 +270,7 @@ class Qwen3TTSService:
                         ref_audio=request.ref_audio,
                         ref_text=request.ref_text,
                         language=request.language,
+                        seed=session_seed,
                         **gen_kwargs,
                     )
                 elif model_type == VoiceModelType.VOICE_DESIGN:
@@ -272,6 +283,7 @@ class Qwen3TTSService:
                         model_path=model_path,
                         instruct=request.instruct,
                         language=request.language,
+                        seed=session_seed,
                         **gen_kwargs,
                     )
                 elif model_type == VoiceModelType.CUSTOM_VOICE:
@@ -281,6 +293,7 @@ class Qwen3TTSService:
                         speaker=speaker,
                         language=request.language,
                         instruct=request.instruct,
+                        seed=session_seed,
                         **gen_kwargs,
                     )
                 else:
