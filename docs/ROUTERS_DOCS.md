@@ -31,7 +31,43 @@ api/src/routers/
     "input": "Hello, world!",
     "voice": "alloy",
     "response_format": "mp3",
-    "speed": 1.0
+    "speed": 1.0,
+    "seed": 42
+}
+```
+
+**Request Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| model | string | No | Model ID (default: "tts-1") |
+| input | string | Yes | Text to synthesize (1-4096 chars) |
+| voice | string | No | Voice ID (default: "alloy") |
+| response_format | string | No | Output format: mp3, wav, opus, ogg, aac, flac (default: "mp3") |
+| speed | float | No | Speed multiplier 0.25-4.0 (default: 1.0) |
+| language | string | No | Language code (en, zh, ja, etc.) |
+| speaker | string | No | Custom speaker name |
+| instruct | string | No | Voice design instruction |
+| ref_audio | string | No | Base64 reference audio |
+| ref_text | string | No | Reference text for ICL mode |
+| streaming_mode | string | No | full, sentence, chunk (default: "sentence") |
+| chunk_size | integer | No | Max chars per chunk |
+| **seed** | integer | No | Random seed (0-2^32-1) for reproducible generation |
+
+**Seed Parameter**:
+The `seed` parameter enables reproducible generation:
+- When set, ensures consistent voice characteristics (emotion, tone, speed) across streaming chunks
+- If not provided, a random seed is generated per request for session consistency
+- Value range: 0 to 2^32-1
+
+**Example with Seed**:
+```json
+{
+    "model": "tts-1",
+    "input": "This text will always sound the same",
+    "voice": "alloy",
+    "response_format": "mp3",
+    "seed": 42
 }
 ```
 

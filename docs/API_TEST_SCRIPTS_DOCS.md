@@ -2,7 +2,7 @@
 
 **Module Path**: `examples/`
 
-**Last Updated**: 2026-02-02
+**Last Updated**: 2026-02-05
 
 ## Overview
 
@@ -83,6 +83,24 @@ All test scripts include `load_env_config()` and `get_api_url()` functions that:
 2. **Case 1b**: Prompt single + synth single (xvec only mode)
 3. **Case 2**: Prompt single + synth batch (ICL mode)
 4. **Case 2b**: Prompt single + synth batch (xvec only mode)
+
+**Seed Parameter Support**:
+All test scripts now support the `seed` parameter for reproducible generation. When set, ensures consistent voice characteristics across repeated requests.
+
+**Example Usage with Seed**:
+```python
+# Reproducible generation with seed
+result = send_api_request(
+    api_url="http://localhost:8000",
+    text="This will always sound the same",
+    language="en",
+    ref_audio_b64=None,
+    ref_text=None,
+    model="qwen3-tts-12hz-0.6b-base",
+    response_format="wav",
+    seed=42  # Consistent voice characteristics across runs
+)
+```
 
 **Key Functions**:
 ```python

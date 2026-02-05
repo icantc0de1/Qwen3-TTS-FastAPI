@@ -2,11 +2,49 @@
 
 **Module Path**: `api/src/inference/qwen3_tts_backend.py`
 
-**Last Updated**: 2026-02-01
+**Last Updated**: 2026-02-05
 
 ## Overview
 
 The Qwen3TTSBackend provides a unified interface for all three Qwen3 TTS generation modes. It abstracts model management, audio processing, and streaming generation behind a clean async API.
+
+## Seed Parameter Support
+
+All generation methods support the `seed` parameter for reproducible generation:
+
+**Implementation**:
+- `_set_seed(seed)`: Internal function that sets seeds for Python's random NumPy, and PyTorch
+- Seed validation: 0 to 2^32-1 (32-bit unsigned integer range)
+- Stream-level consistency: Seed is applied per generation call to ensure consistent voice characteristics across streaming chunks
+
+**Behavior**:
+- When `seed=None`: Uses default behavior (random initialization)
+- When `seed` is set: Ensures identical voice characteristics (emotion, tone, speed) for the same input
+- Service layer integration: Service auto-generates a seed per request if not provided, ensuring consistency across streaming chunks
+
+**Example**:
+```python
+# Reproducible voice cloning
+async for chunk in backend.voice_clone(
+    text="Hello world",
+    model_path="models/base",
+    ref_audio="ref.wav",
+    ref_text="Original text",
+    language="en",
+    seed=42  # Consistent voice across generations
+):
+    yield chunk.data
+
+# Reproducible custom voice
+async for chunk in backend.custom_voice(
+    text="Welcome",
+    model_path="models/custom-voice",
+    speaker="Vivian",
+    language="en",
+    seed=12345
+):
+    yield chunk.data
+```
 
 ## Module Structure
 
@@ -95,6 +133,7 @@ async for chunk in backend.voice_clone(text="Hello", model_path="models/base", r
 - `ref_text`: Reference transcript (required for ICL)
 - `language`: Target language
 - `x_vector_only_mode`: Mode selection
+- `seed`: Random seed (0 to 2^32-1) for reproducible generation
 - `**generation_kwargs`: Generation hyperparameters
 
 **Usage Example**:
@@ -108,6 +147,17 @@ chunks = backend.voice_clone(
     language="en",
     temperature=0.9,
     top_p=1.0,
+)
+
+# With reproducible generation
+chunks = backend.voice_clone(
+    text="Hello, this is my cloned voice!",
+    model_path="models/base",
+    ref_audio="my_voice_sample.wav",
+    ref_text="Original sample text",
+    language="en",
+    seed=42,  # Consistent voice characteristics across generations
+    temperature=0.9,
 )
 
 async for chunk in chunks:
@@ -129,6 +179,7 @@ async for chunk in chunks:
 - `speaker`: Speaker name (e.g., "Vivian", "Serena")
 - `language`: Target language
 - `instruct`: Optional style instruction
+- `seed`: Random seed (0 to 2^32-1) for reproducible generation
 - `**generation_kwargs`: Generation hyperparameters
 
 **Usage Example**:
@@ -139,6 +190,16 @@ chunks = backend.custom_voice(
     speaker="Vivian",
     language="en",
     instruct="Speak with enthusiasm and energy",
+)
+
+# With reproducible generation
+chunks = backend.custom_voice(
+    text="Welcome to the presentation!",
+    model_path="models/custom-voice",
+    speaker="Vivian",
+    language="en",
+    instruct="Speak with enthusiasm and energy",
+    seed=42,  # Consistent voice characteristics across generations
 )
 
 async for chunk in chunks:
@@ -159,6 +220,7 @@ async for chunk in chunks:
 - `model_path`: Path to voice design model
 - `instruct`: Voice description (e.g., "A warm, friendly female voice in her 30s")
 - `language`: Target language
+- `seed`: Random seed (0 to 2^32-1) for reproducible generation
 - `**generation_kwargs`: Generation hyperparameters
 
 **Usage Example**:
@@ -168,6 +230,15 @@ chunks = backend.voice_design(
     model_path="models/voice-design",
     instruct="A professional male voice with a calm, reassuring tone",
     language="en",
+)
+
+# With reproducible generation
+chunks = backend.voice_design(
+    text="Hello, how can I help you today?",
+    model_path="models/voice-design",
+    instruct="A professional male voice with a calm, reassuring tone",
+    language="en",
+    seed=42,  # Consistent voice characteristics across generations
 )
 
 async for chunk in chunks:

@@ -2,7 +2,7 @@
 
 **Module Path**: `api/src/structures/`
 
-**Last Updated**: 2026-02-01
+**Last Updated**: 2026-02-05
 
 ## Overview
 
@@ -118,10 +118,12 @@ request = OpenAISpeechRequest(
 | ref_text | Optional[str] | None | Reference text for ICL mode |
 | streaming_mode | Optional[StreamingMode] | SENTENCE | Audio streaming mode (full, sentence, chunk) |
 | chunk_size | Optional[int] | None | Max chars per chunk (default: 300 for sentence, 200 for chunk) |
+| seed | Optional[int] | None | Random seed (0 to 2^32-1) for reproducible generation |
 
 **Validation Logic**:
 - `input`: Strips whitespace, validates non-empty after stripping
 - `speed`: Validates 0.25 <= speed <= 4.0
+- `seed`: Validates 0 <= seed <= 2^32-1 (optional)
 
 **Usage Example**:
 ```python
@@ -155,10 +157,20 @@ chunk_request = OpenAISpeechRequest(
     chunk_size=150
 )
 
+# Reproducible generation with seed
+seed_request = OpenAISpeechRequest(
+    model="tts-1",
+    input="This text will always generate the same voice characteristics.",
+    voice="alloy",
+    response_format="mp3",
+    seed=42  # Any integer between 0 and 2^32-1
+)
+
 # Access validated data
 print(request.input)  # "Hello, world!"
 print(request.speed)  # 1.0
 print(streaming_request.streaming_mode)  # StreamingMode.SENTENCE
+print(seed_request.seed)  # 42
 
 # Invalid request raises ValidationError
 try:

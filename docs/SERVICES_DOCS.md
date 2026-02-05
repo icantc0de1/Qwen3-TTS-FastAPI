@@ -2,7 +2,7 @@
 
 **Module Path**: `api/src/services/qwen3_tts_service.py`
 
-**Last Updated**: 2026-02-01
+**Last Updated**: 2026-02-05
 
 ## Overview
 
@@ -96,10 +96,27 @@ async def validate_request(self, request: OpenAISpeechRequest) -> None:
 ### 3. Audio Processing Pipeline
 
 ```
-Request → Resolve Model/Voice → Determine Mode → Backend Generation 
+Request → Resolve Model/Voice → Determine Mode → Backend Generation
     ↓
 Audio Encoding → Chunk Assembly → Yield Response
 ```
+
+### 4. Reproducible Generation with Seed
+
+The service handles seed parameter for consistent voice across streaming chunks:
+
+**Seed Handling Logic**:
+```python
+# If user provides a seed, use it; otherwise generate one for session consistency
+session_seed = request.seed
+if session_seed is None:
+    session_seed = random.randint(0, 2**32 - 1)
+```
+
+**Key Behaviors**:
+- **User-provided seed**: Ensures identical voice characteristics across all streaming chunks and repeated requests
+- **Auto-generated seed**: Consistent within a request but may vary between requests
+- **Seed propagation**: Applied to all backend generation calls (voice_clone, custom_voice, voice_design)
 
 **Format Support**:
 - Input: Always raw PCM from backend
@@ -159,6 +176,12 @@ The service supports three streaming modes controlled by `request.streaming_mode
   - Overlap ensures smooth audio transitions
   - Best for very long texts
 
+**Seed for Reproducible Generation**:
+The `request.seed` parameter enables reproducible generation:
+- When set, ensures consistent voice characteristics across streaming chunks
+- If not provided, a random seed is generated per request for session consistency
+- Value range: 0 to 2^32-1
+
 **Example**:
 ```python
 # Sentence-level streaming (default)
@@ -179,11 +202,24 @@ async for chunk in service.generate_speech(request):
 chunk_request = OpenAISpeechRequest(
     model="tts-1",
     input="This is a very long text...",
-    voice="alloy", 
+    voice="alloy",
     response_format="mp3",
     streaming_mode=StreamingMode.CHUNK,
     chunk_size=200  # 200 characters per chunk
 )
+
+# Reproducible generation with seed
+seed_request = OpenAISpeechRequest(
+    model="tts-1",
+    input="This text will always generate the same voice characteristics.",
+    voice="alloy",
+    response_format="mp3",
+    streaming_mode=StreamingMode.SENTENCE,
+    seed=42  # Ensures consistent voice across streaming chunks
+)
+
+async for chunk in service.generate_speech(seed_request):
+    save_to_file(chunk.data)
 ```
 
 **Performance Characteristics**:
