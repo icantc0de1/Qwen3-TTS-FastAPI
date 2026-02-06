@@ -3,6 +3,7 @@
 import io
 from typing import AsyncGenerator
 
+import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from loguru import logger
@@ -13,6 +14,7 @@ from api.src.structures.schemas import (
     ModelsListResponse,
     ModelInfo,
     OpenAISpeechRequest,
+    StreamingMode,
     VoicesListResponse,
     VoiceInfo,
 )
@@ -119,28 +121,103 @@ async def create_speech(
             chunk_count = 0
             total_bytes = 0
 
+            # Detect WAV format with streaming mode
+            # For this case, we collect all chunks and encode once as a single WAV file
+            streaming_mode = request.streaming_mode or StreamingMode.SENTENCE
+            is_wav_streaming = (
+                streaming_mode != StreamingMode.FULL
+                and request.response_format == "wav"
+            )
+
             try:
-                async for chunk in service.generate_speech(request):
-                    chunk_count += 1
+                if is_wav_streaming:
+                    # Collect all raw PCM numpy chunks
+                    pcm_chunks = []
+                    sample_rate = 24000  # Default
 
-                    if isinstance(chunk.data, bytes):
-                        audio_bytes = chunk.data
-                    else:
-                        # Encode numpy array to requested format
-                        audio_bytes = service.backend.encode_audio(
-                            chunk.data,
-                            chunk.sample_rate,
-                            format=request.response_format,
-                        )
+                    async for chunk in service.generate_speech(request):
+                        chunk_count += 1
 
-                    total_bytes += len(audio_bytes)
-                    yield audio_bytes
+                        if isinstance(chunk.data, np.ndarray):
+                            pcm_chunks.append(chunk.data)
+                            sample_rate = chunk.sample_rate
+                        else:
+                            # Should not happen for WAV streaming (service yields raw arrays)
+                            # But handle it gracefully
+                            logger.warning(
+                                f"Received bytes chunk in WAV streaming mode at chunk {chunk_count}"
+                            )
 
-                    if chunk.is_last:
+                        if chunk.is_last:
+                            # Concatenate all PCM chunks and encode as single WAV
+                            if pcm_chunks:
+                                combined_audio = np.concatenate(pcm_chunks)
+                                audio_bytes = service.backend.encode_audio(
+                                    combined_audio,
+                                    sample_rate,
+                                    format="wav",
+                                )
+                                total_bytes = len(audio_bytes)
+                                yield audio_bytes
+                                logger.info(
+                                    f"Streaming complete: {chunk_count} chunks, "
+                                    f"{total_bytes} bytes total (single WAV)"
+                                )
+                            else:
+                                # Empty audio - create minimal valid WAV
+                                import io
+
+                                import soundfile as sf
+
+                                empty_wav = np.array([], dtype=np.float32)
+                                wav_buffer = io.BytesIO()
+                                sf.write(wav_buffer, empty_wav, sample_rate, format="wav")
+                                audio_bytes = wav_buffer.getvalue()
+                                total_bytes = len(audio_bytes)
+                                yield audio_bytes
+                                logger.info(
+                                    f"Streaming complete: {chunk_count} chunks, "
+                                    f"{total_bytes} bytes total (empty WAV)"
+                                )
+
+                    if chunk_count == 0:
+                        # No chunks were generated - create minimal WAV
+                        import io
+
+                        import soundfile as sf
+
+                        empty_wav = np.array([], dtype=np.float32)
+                        wav_buffer = io.BytesIO()
+                        sf.write(wav_buffer, empty_wav, sample_rate, format="wav")
+                        audio_bytes = wav_buffer.getvalue()
+                        total_bytes = len(audio_bytes)
+                        yield audio_bytes
                         logger.info(
-                            f"Streaming complete: {chunk_count} chunks, "
-                            f"{total_bytes} bytes total"
+                            f"Streaming complete: 0 chunks, {total_bytes} bytes total (empty WAV fallback)"
                         )
+                else:
+                    # Original streaming behavior for non-WAV formats or FULL mode
+                    async for chunk in service.generate_speech(request):
+                        chunk_count += 1
+
+                        if isinstance(chunk.data, bytes):
+                            audio_bytes = chunk.data
+                        else:
+                            # Encode numpy array to requested format
+                            audio_bytes = service.backend.encode_audio(
+                                chunk.data,
+                                chunk.sample_rate,
+                                format=request.response_format,
+                            )
+
+                        total_bytes += len(audio_bytes)
+                        yield audio_bytes
+
+                        if chunk.is_last:
+                            logger.info(
+                                f"Streaming complete: {chunk_count} chunks, "
+                                f"{total_bytes} bytes total"
+                            )
             except Exception as e:
                 logger.error(f"Streaming error in chunk {chunk_count}: {e}")
                 # Re-raise so the HTTP layer can handle it

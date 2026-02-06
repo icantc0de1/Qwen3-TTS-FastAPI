@@ -239,8 +239,11 @@ class Qwen3TTSService:
         }
 
         streaming_mode = request.streaming_mode or StreamingMode.SENTENCE
+        # Use chunk_size from request, or default based on mode
+        # SENTENCE mode: smaller chunks for sentence-level streaming
+        # CHUNK mode: larger chunks with overlap
         chunk_size = request.chunk_size or (
-            150 if streaming_mode == StreamingMode.SENTENCE else 200
+            180 if streaming_mode == StreamingMode.SENTENCE else 250
         )
 
         # Handle seed for consistent voice across streaming chunks
@@ -301,21 +304,44 @@ class Qwen3TTSService:
 
                 async for chunk in backend_gen:
                     if isinstance(chunk.data, np.ndarray):
-                        encoded_bytes = self.backend.encode_audio(
-                            chunk.data,
-                            chunk.sample_rate,
-                            format=request.response_format,
-                        )
+                        # For WAV format in streaming mode, yield raw PCM data
+                        # This allows the router to collect all chunks and encode as one WAV file
+                        # For non-streaming (FULL) mode or other formats, encode each chunk
+                        if (
+                            streaming_mode != StreamingMode.FULL
+                            and request.response_format == "wav"
+                        ):
+                            # Yield raw numpy array for WAV streaming
+                            yield AudioChunk(
+                                data=chunk.data,
+                                sample_rate=chunk.sample_rate,
+                                is_last=is_last,
+                                format="pcm",
+                                timestamp_ms=chunk.timestamp_ms,
+                            )
+                        else:
+                            # Encode to requested format (FULL mode or non-WAV formats)
+                            encoded_bytes = self.backend.encode_audio(
+                                chunk.data,
+                                chunk.sample_rate,
+                                format=request.response_format,
+                            )
+                            yield AudioChunk(
+                                data=encoded_bytes,
+                                sample_rate=chunk.sample_rate,
+                                is_last=is_last,
+                                format=request.response_format,
+                                timestamp_ms=chunk.timestamp_ms,
+                            )
                     else:
-                        encoded_bytes = chunk.data
-
-                    yield AudioChunk(
-                        data=encoded_bytes,
-                        sample_rate=chunk.sample_rate,
-                        is_last=is_last,
-                        format=request.response_format,
-                        timestamp_ms=chunk.timestamp_ms,
-                    )
+                        # Already encoded bytes, pass through
+                        yield AudioChunk(
+                            data=chunk.data,
+                            sample_rate=chunk.sample_rate,
+                            is_last=is_last,
+                            format=request.response_format,
+                            timestamp_ms=chunk.timestamp_ms,
+                        )
 
             except Exception as e:
                 logger.error(f"Failed to generate audio for chunk {chunk_index}: {e}")
